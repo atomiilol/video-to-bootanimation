@@ -107,3 +107,9 @@ If you like this project, consider supporting me by sponsoring the project or bu
 
 
 Maintained by **@rhythmcache**
+
+## Windows converter
+
+Use the [Windows batch launchers](windows/README.md) to convert videos to
+bootanimation ZIPs or convert bootanimation ZIPs back to MP4 on Windows.
+Python and Windows FFmpeg are required; Android binaries are not used.

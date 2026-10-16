@@ -1,0 +1,48 @@
+name: Windows converter release
+on:
+  push:
+    tags: ['windows-*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install FFmpeg
+        run: choco install ffmpeg --no-progress -y
+      - name: Test both batch launchers
+        shell: cmd
+        run: |
+          mkdir "test files"
+          ffmpeg -v error -f lavfi -i testsrc2=size=64x96:rate=6 -t 1 -c:v libx264 "test files\input video.mp4"
+          if errorlevel 1 exit /b 1
+          call windows\video-to-boot.bat "test files\input video.mp4" "test files\bootanimation.zip" --fps 6
+          if errorlevel 1 exit /b 1
+          call windows\boot-to-video.bat "test files\bootanimation.zip" "test files\round trip.mp4"
+          if errorlevel 1 exit /b 1
+          ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=width,height,nb_read_frames -of json "test files\round trip.mp4" > "test files\probe.json"
+          if errorlevel 1 exit /b 1
+          python -c "import json; s=json.load(open('test files/probe.json'))['streams'][0]; assert (s['width'],s['height'],s['nb_read_frames']) == (64,96,'6')"
+      - name: Package
+        shell: pwsh
+        run: Compress-Archive -Path windows/*, LICENSE -DestinationPath windows-bootanimation-converter.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-bootanimation-converter
+          path: windows-bootanimation-converter.zip
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/windows-')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Windows bootanimation converter
+          body: |
+            Windows batch launchers for video to bootanimation ZIP and bootanimation ZIP to MP4.
+            Extract the ZIP and read README.md. Requires Python 3.9+ and Windows FFmpeg (ffmpeg.exe and ffprobe.exe), supplied separately.
+            Supports spaces in file paths. Audio and advanced Android descriptor features are not supported.
+          files: windows-bootanimation-converter.zip
+          fail_on_unmatched_files: true
